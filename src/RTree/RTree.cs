@@ -2,9 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Enyim.Collections
 {
@@ -16,13 +13,13 @@ namespace Enyim.Collections
 		// per-bucket
 		private readonly int maxEntries;
 		private readonly int minEntries;
-
+     
 		private RTreeNode<T> root;
 
 		public RTree(int maxEntries = 9)
 		{
 			this.maxEntries = Math.Max(4, maxEntries);
-			this.minEntries = (int)Math.Max(2, Math.Ceiling((double)this.maxEntries * 0.4));
+			this.minEntries = (int)Math.Max(2, Math.Ceiling(this.maxEntries * 0.4));
 
 			Clear();
 		}
@@ -87,7 +84,7 @@ namespace Enyim.Collections
 					height = (int)Math.Ceiling(Math.Log(N) / Math.Log(M));
 
 					// target number of root entries to maximize storage utilization
-					M = (int)Math.Ceiling((double)N / Math.Pow(M, height - 1));
+					M = (int)Math.Ceiling(N / Math.Pow(M, height - 1));
 
 					items.Sort(CompareNodesByMinX);
 				}
@@ -132,23 +129,21 @@ namespace Enyim.Collections
 
 			while (node != null)
 			{
-				for (var i = 0; i < node.Children.Count; i++)
-				{
-					var child = node.Children[i];
-					var childEnvelope = child.Envelope;
+			  foreach (var child in node.Children)
+			  {
+			    var childEnvelope = child.Envelope;
 
-					if (envelope.Intersects(childEnvelope))
-					{
-						if (node.IsLeaf) retval.Add(child);
-						else if (envelope.Contains(childEnvelope)) Collect(child, retval);
-						else nodesToSearch.Push(child);
-					}
-				}
+			    if (!envelope.Intersects(childEnvelope)) continue;
 
-				node = nodesToSearch.TryPop();
+			    if (node.IsLeaf) retval.Add(child);
+			    else if (envelope.Contains(childEnvelope)) Collect(child, retval);
+			    else nodesToSearch.Push(child);
+			  }
+
+			  node = nodesToSearch.TryPop();
 			}
 
-			return retval;
+		  return retval;
 		}
 
 		private static void Collect(RTreeNode<T> node, List<RTreeNode<T>> result)
@@ -207,7 +202,7 @@ namespace Enyim.Collections
 			AdjutsParentBounds(envelope, insertPath, level);
 		}
 
-		private static int CombinedArea(Envelope what, Envelope with)
+		private static double CombinedArea(Envelope what, Envelope with)
 		{
 			var minX1 = Math.Max(what.X1, with.X1);
 			var minY1 = Math.Max(what.Y1, with.Y1);
@@ -217,7 +212,7 @@ namespace Enyim.Collections
 			return (maxX2 - minX1) * (maxY2 - minY1);
 		}
 
-		private static int IntersectionArea(Envelope what, Envelope with)
+		private static double IntersectionArea(Envelope what, Envelope with)
 		{
 			var minX = Math.Max(what.X1, with.X1);
 			var minY = Math.Max(what.Y1, with.Y1);
@@ -235,8 +230,8 @@ namespace Enyim.Collections
 
 				if (node.IsLeaf || path.Count - 1 == level) break;
 
-				var minArea = Int32.MaxValue;
-				var minEnlargement = Int32.MaxValue;
+				var minArea = Double.MaxValue;
+				var minEnlargement = Double.MaxValue;
 
 				RTreeNode<T> targetNode = null;
 
@@ -309,9 +304,9 @@ namespace Enyim.Collections
 
 		private int ChooseSplitIndex(RTreeNode<T> node, int minEntries, int totalCount)
 		{
-			var minOverlap = Int32.MaxValue;
-			var minArea = Int32.MaxValue;
-			int index = 0;
+			var minOverlap = Double.MaxValue;
+			var minArea = Double.MaxValue;
+			var index = 0;
 
 			for (var i = minEntries; i <= totalCount - minEntries; i++)
 			{
@@ -332,11 +327,10 @@ namespace Enyim.Collections
 				else if (overlap == minOverlap)
 				{
 					// otherwise choose distribution with minimum area
-					if (area < minArea)
-					{
-						minArea = area;
-						index = i;
-					}
+				  if (!(area < minArea)) continue;
+
+				  minArea = area;
+				  index = i;
 				}
 			}
 
@@ -456,7 +450,7 @@ namespace Enyim.Collections
 			return retval;
 		}
 
-		private static void AdjutsParentBounds(Envelope bbox, List<RTreeNode<T>> path, int level)
+		private static void AdjutsParentBounds(Envelope bbox, IReadOnlyList<RTreeNode<T>> path, int level)
 		{
 			// adjust bboxes along the given tree path
 			for (var i = level; i >= 0; i--)
@@ -479,7 +473,7 @@ namespace Enyim.Collections
 		private static int CompareNodesByMinX(RTreeNode<T> a, RTreeNode<T> b) { return a.Envelope.X1.CompareTo(b.Envelope.X1); }
 		private static int CompareNodesByMinY(RTreeNode<T> a, RTreeNode<T> b) { return a.Envelope.Y1.CompareTo(b.Envelope.Y1); }
 
-		private static int AllDistMargin(RTreeNode<T> node, int m, int M, Comparison<RTreeNode<T>> compare)
+		private static double AllDistMargin(RTreeNode<T> node, int m, int M, Comparison<RTreeNode<T>> compare)
 		{
 			node.Children.Sort(compare);
 
